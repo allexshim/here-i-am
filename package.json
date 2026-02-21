@@ -1,0 +1,28 @@
+{
+  "name": "here-i-am",
+  "version": "1.0.0",
+  "description": "Share your travel stays and schedules with family and friends.",
+  "homepage": "https://github.com/allexshim/here-i-am#readme",
+  "bugs": {
+    "url": "https://github.com/allexshim/here-i-am/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/allexshim/here-i-am.git"
+  },
+  "license": "ISC",
+  "author": "shim",
+  "type": "module",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "dependencies": {
+    "dotenv": "^17.2.4",
+    "express": "^5.2.1",
+    "pg": "^8.18.0"
+  },
+  "devDependencies": {
+    "jest": "^30.2.0"
+  }
+}
