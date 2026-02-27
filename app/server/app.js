@@ -1,10 +1,10 @@
 import express from "express";
-// import todoRouter from "./router/todo.js";
+import stayRouter from "./router/stay.js";
 const app = express();
 
 app.use(express.json());
 
-// app.use("/todos", todoRouter);
+app.use("/stays", stayRouter);
 
 app.use((error, req, res, next) => {
   console.error(error);

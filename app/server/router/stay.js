@@ -4,10 +4,8 @@ const router = express.Router();
 
 router.get("/", stayController.getStays);
 router.get("/:id", stayController.getStayById);
-
-// TODO: CRUD stay
-router.post("/", "");
-router.delete("/:id", "");
-router.patch("/:id", "");
+router.delete("/:id", stayController.removeStay);
+router.post("/", stayController.createStay);
+router.patch("/:id", stayController.updateStay);
 
 export default router;
