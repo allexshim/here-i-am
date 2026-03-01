@@ -31,13 +31,13 @@ export async function createStay(req, res) {
 
 export async function getStays(req, res) {
   const stays = await stayRepository.findAll();
-  res.status(200).json(stays);
+  res.status(200).json(stays); // TODO: Date property의 timezone을 정해야한다.
 }
 
 export async function getStayById(req, res) {
   const { id } = req.params;
   const stay = await stayRepository.findById(id);
-  res.status(200).json(stay);
+  res.status(200).json(stay); // TODO: Date property의 timezone을 정해야한다.
 }
 
 export async function removeStay(req, res) {
@@ -46,21 +46,27 @@ export async function removeStay(req, res) {
   if (deletedCount == 0) {
     res.status(404).json({ message: "Something went wrong." });
   } else {
-    res.sendStatue(204);
+    res.sendStatus(204);
   }
 }
 
 export async function updateStay(req, res) {
-  const { id, expected_end_at, end_at, start_at, comment, accommodation } =
-    req.params;
+  const { id } = req.params;
+  const { expected_end_at, end_at, start_at, comment, accommodation } =
+    req.body;
 
-  const affectedCount = await stayRepository.update(id, {
-    expected_end_at,
-    end_at,
-    start_at,
-    comment,
-    accommodation,
-  });
+  // NOTE: undefined인 params를 strip 해줘야 한다.
+  const params = Object.fromEntries(
+    Object.entries({
+      expected_end_at,
+      end_at,
+      start_at,
+      comment,
+      accommodation,
+    }).filter(([_, value]) => !!value),
+  );
+
+  const affectedCount = await stayRepository.update(id, params);
   if (affectedCount == 1) {
     const stay = await stayRepository.findById(id);
     res.status(200).json(stay);

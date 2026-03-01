@@ -61,7 +61,7 @@ export async function update(
 
   queryValues.push(id);
   const result = await query(
-    `UPDATE stay
+    `UPDATE stays
   SET ${setClauses.join(", ")}
   WHERE id = $${idx}`,
     queryValues,
