@@ -1,5 +1,7 @@
-import { Pool } from "pg";
+import pg from "pg";
 import { config } from "../config.js";
+
+const { Pool } = pg;
 
 const connectionString = process.env.DATABASE_URL;
 
@@ -16,7 +18,9 @@ export const pool = connectionString
       port: config.db.port,
     });
 
-export async function query(text, params = []) {
-  const res = await pool.query(text, params);
-  return res;
+export async function query<T extends pg.QueryResultRow = pg.QueryResultRow>(
+  text: string,
+  params: unknown[] = [],
+): Promise<pg.QueryResult<T>> {
+  return pool.query<T>(text, params);
 }
