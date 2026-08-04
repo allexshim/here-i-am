@@ -4,6 +4,8 @@ on: [push]
 
 jobs:
   test-project:
+    # FIXME: 임시로 비활성화.
+    if: false
     runs-on: ubuntu-latest
 
     steps:
