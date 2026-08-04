@@ -1,6 +1,9 @@
 import express from "express";
 import * as stayController from "../controller/stay.js";
+import { requiredAuth } from "../middleware/auth.js";
+
 const router = express.Router();
+router.use(requiredAuth);
 
 router.get("/", stayController.getStays);
 router.get("/:id", stayController.getStayById);
