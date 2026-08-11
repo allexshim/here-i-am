@@ -1,35 +1,59 @@
 import { afterEach, describe, expect, jest } from "@jest/globals";
 
 const mockStayRepository = {
-  findAll: jest.fn(),
-  findById: jest.fn(),
+  findAllByUserId: jest.fn(),
+  findOneByIdAndUserId: jest.fn(),
   create: jest.fn(),
   remove: jest.fn(),
   update: jest.fn(),
 };
 
-await jest.unstable_mockModule("../data/stay.js", () => mockStayRepository);
+const mockGeocoding = {
+  geocode: jest.fn(),
+};
 
-const stayRepository = await import("../data/stay.js");
+await jest.unstable_mockModule(
+  "../repository/stay.js",
+  () => mockStayRepository,
+);
+
+await jest.unstable_mockModule(
+  "../integration/geocoding.js",
+  () => mockGeocoding,
+);
+
+const stayRepository = await import("../repository/stay.js");
+const { geocode } = await import("../integration/geocoding.js");
 const { createStay, getStays, getStayById, removeStay, updateStay } =
   await import("./stay.js");
 
+const userId = "AbCdEfGhIjKl";
 const stays = [
   {
-    id: 1,
+    id: "sTaYIdSeoul1",
+    userId,
     city: "Seoul",
     country: "South Korea",
-    start_at: "2026-02-27",
-    expected_end_at: "2026-08-01",
+    startAt: "2026-08-07",
+    endAt: null,
+    expectedEndAt: "2026-08-10",
+    comment: null,
     accommodation: "Seoul hostel",
+    lat: 123.123,
+    lng: 123.123,
   },
   {
-    id: 2,
+    id: "sTaYIdBusan2",
+    userId,
     city: "Busan",
     country: "South Korea",
-    start_at: "2026-03-01",
-    expected_end_at: "2026-10-01",
+    startAt: "2026-08-10",
+    endAt: null,
+    expectedEndAt: "2026-08-20",
+    comment: null,
     accommodation: "Busan hostel",
+    lat: 345.345,
+    lng: 345.345,
   },
 ];
 
@@ -39,42 +63,86 @@ describe("stay controller test", () => {
   });
 
   describe("createStay test", () => {
-    test("returns new stay with status 201", async () => {
-      const body = {
-        city: "Seoul",
-        country: "South Korea",
-        start_at: "2026-03-02",
-        expected_end_at: "2026-03-12",
-        accommodation: "Seoul Hostel",
-      };
+    test("get coords and create stay, returns new stay with status 201", async () => {
       const req = {
-        body,
+        userId,
+        body: {
+          city: "Seoul",
+          country: "South Korea",
+          startAt: "2026-08-07",
+          expectedEndAt: "2026-08-10",
+          accommodation: "Seoul Hostel",
+        },
       };
       const res = {
         status: jest.fn().mockReturnThis(),
         json: jest.fn(),
       };
 
-      stayRepository.create.mockResolvedValue(body);
-      stayRepository.findById.mockResolvedValue(stays[0]);
+      geocode.mockResolvedValue({ lat: 123.123, lng: 123.123 });
+      stayRepository.create.mockResolvedValue(stays[0]);
 
       await createStay(req, res);
 
-      expect(stayRepository.create).toHaveBeenCalled();
-      expect(stayRepository.findById).toHaveBeenCalled();
+      expect(geocode).toHaveBeenCalledWith("Seoul", "South Korea");
+      expect(stayRepository.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          userId,
+          city: "Seoul",
+          country: "South Korea",
+          startAt: "2026-08-07",
+          expectedEndAt: "2026-08-10",
+          accommodation: "Seoul Hostel",
+          lat: 123.123,
+          lng: 123.123,
+        }),
+      );
       expect(res.status).toHaveBeenCalledWith(201);
       expect(res.json).toHaveBeenCalledWith(stays[0]);
+    });
+
+    test("When geocoding fail, create stay with null coords", async () => {
+      const req = {
+        userId,
+        body: {
+          city: "mars",
+          country: "somewhere not earth",
+          startAt: "2026-08-07",
+          expectedEndAt: "2026-08-10",
+          accommodation: "Seoul Hostel",
+        },
+      };
+      const res = {
+        status: jest.fn().mockReturnThis(),
+        json: jest.fn(),
+      };
+
+      geocode.mockResolvedValue(null);
+      stayRepository.create.mockResolvedValue({
+        ...stays[0],
+        lat: null,
+        lng: null,
+      });
+
+      await createStay(req, res);
+
+      expect(geocode).toHaveBeenCalled();
+      expect(stayRepository.create).toHaveBeenCalledWith(
+        expect.objectContaining({ lat: null, lng: null }),
+      );
+      expect(res.status).toHaveBeenCalledWith(201);
     });
 
     test("returns 500 with error message when repository throws error", async () => {
       const body = {
         city: "Seoul",
         country: "South Korea",
-        start_at: "2026-03-02",
-        expected_end_at: "2026-03-12",
+        startAt: "2026-03-02",
+        expectedEndAt: "2026-03-12",
         accommodation: "Seoul Hostel",
       };
       const req = {
+        userId,
         body,
       };
       const res = {
@@ -94,18 +162,18 @@ describe("stay controller test", () => {
   });
 
   describe("getStays test", () => {
-    test("return stays with status 200", async () => {
-      const req = {};
+    test("return all stays owned by user with status 200", async () => {
+      const req = { userId };
       const res = {
         status: jest.fn().mockReturnThis(),
         json: jest.fn(),
       };
 
-      stayRepository.findAll.mockResolvedValue(stays);
+      stayRepository.findAllByUserId.mockResolvedValue(stays);
 
-      await getStays(res, res);
+      await getStays(req, res);
 
-      expect(stayRepository.findAll).toHaveBeenCalled();
+      expect(stayRepository.findAllByUserId).toHaveBeenCalled();
       expect(res.status).toHaveBeenCalledWith(200);
       expect(res.json).toHaveBeenCalledWith(stays);
     });
@@ -113,25 +181,43 @@ describe("stay controller test", () => {
 
   describe("getStayById test", () => {
     test("return stay with status 200", async () => {
-      const req = { params: { id: 1 } };
+      const req = { userId, params: { id: stays[0].id } };
       const res = {
         status: jest.fn().mockReturnThis(),
         json: jest.fn(),
       };
 
-      stayRepository.findById.mockResolvedValue(stays[0]);
+      stayRepository.findOneByIdAndUserId.mockResolvedValue(stays[0]);
 
       await getStayById(req, res);
 
-      expect(stayRepository.findById).toHaveBeenCalled();
+      expect(stayRepository.findOneByIdAndUserId).toHaveBeenCalledWith(
+        stays[0].id,
+        userId,
+      );
       expect(res.status).toHaveBeenCalledWith(200);
       expect(res.json).toHaveBeenCalledWith(stays[0]);
+    });
+
+    test("return 404 when stay not found", async () => {
+      const req = { userId, params: { id: "other" } };
+      const res = {
+        status: jest.fn().mockReturnThis(),
+        json: jest.fn(),
+      };
+
+      stayRepository.findOneByIdAndUserId.mockResolvedValue(undefined);
+
+      await getStayById(req, res);
+
+      expect(res.status).toHaveBeenCalledWith(404);
+      expect(res.json).toHaveBeenCalledWith({ message: "Stay not found." });
     });
   });
 
   describe("removeStay test", () => {
     test("returns 204 when stay is deleted", async () => {
-      const req = { params: { id: 1 } };
+      const req = { userId, params: { id: stays[0].id } };
       const res = {
         sendStatus: jest.fn(),
       };
@@ -140,12 +226,12 @@ describe("stay controller test", () => {
       stayRepository.remove.mockResolvedValue(1);
 
       await removeStay(req, res);
-      expect(stayRepository.remove).toHaveBeenCalled();
+      expect(stayRepository.remove).toHaveBeenCalledWith(stays[0].id, userId);
       expect(res.sendStatus).toHaveBeenCalledWith(204);
     });
 
     test("return 404 when stay does not exist", async () => {
-      const req = { params: { id: 1 } };
+      const req = { userId, params: { id: "other" } };
       const res = {
         status: jest.fn().mockReturnThis(),
         json: jest.fn(),
@@ -164,83 +250,143 @@ describe("stay controller test", () => {
   });
 
   describe("updateStay test", () => {
-    test("return updated stay with status 200", async () => {
+    test("no coords changed: return updated stay with status 200", async () => {
       const body = {
-        expected_end_at: "2026-03-02",
-        end_at: "2026-03-02",
-        start_at: "2026-02-20",
+        endAt: "2026-08-10",
         comment: "Left as plan",
-        accommodation: "Seoul Hostel",
       };
-      const req = { params: { id: 1 }, body };
-      const res = {
-        status: jest.fn().mockReturnThis(),
-        json: jest.fn(),
-      };
-
-      const updatedStay = {
-        id: 1,
-        city: "Seoul",
-        country: "South Korea",
-        expected_end_at: "2026-03-02",
-        end_at: "2026-03-02",
-        start_at: "2026-02-20",
-        comment: "Left as plan",
-        accommodation: "Seoul Hostel",
-      };
-
-      stayRepository.update.mockResolvedValue(1);
-      stayRepository.findById.mockResolvedValue(updatedStay);
-
-      await updateStay(req, res);
-
-      expect(stayRepository.update).toHaveBeenCalled();
-      expect(stayRepository.findById).toHaveBeenCalled();
-      expect(res.status).toHaveBeenCalledWith(200);
-      expect(res.json).toHaveBeenCalledWith(updatedStay);
-    });
-
-    test("update stay with provided fields only", async () => {
-      const body = {
-        expected_end_at: "2026-03-02",
-        end_at: undefined,
-      };
-      const req = { params: { id: 1 }, body };
+      const req = { userId, params: { id: stays[0].id }, body };
       const res = {
         status: jest.fn().mockReturnThis(),
         json: jest.fn(),
       };
 
       stayRepository.update.mockResolvedValue(1);
-      stayRepository.findById.mockResolvedValue({
-        id: 1,
-        city: "Seoul",
-        country: "South Korea",
-        start_at: "2026-02-27",
-        expected_end_at: "2026-03-02",
-        accommodation: "Seoul hostel",
+      stayRepository.findOneByIdAndUserId.mockResolvedValue({
+        ...stays[0],
+        ...body,
       });
 
       await updateStay(req, res);
 
-      expect(stayRepository.update).toHaveBeenCalled();
-      expect(stayRepository.findById).toHaveBeenCalled();
+      expect(geocode).not.toHaveBeenCalled();
+      expect(stayRepository.update).toHaveBeenCalledWith(stays[0].id, userId, {
+        comment: "Left as plan",
+        endAt: "2026-08-10",
+      });
+      expect(res.status).toHaveBeenCalledWith(200);
+      expect(res.json).toHaveBeenCalledWith({ ...stays[0], ...body });
+    });
+
+    test("coords changed: re-geocode when city, country changed", async () => {
+      const req = {
+        userId,
+        params: { id: stays[0].id },
+        body: {
+          city: "Busan",
+        },
+      };
+      const res = {
+        status: jest.fn().mockReturnThis(),
+        json: jest.fn(),
+      };
+
+      stayRepository.findOneByIdAndUserId
+        .mockResolvedValueOnce(stays[0])
+        .mockResolvedValueOnce({
+          ...stays[0],
+          city: "Busan",
+          lat: 345.345,
+          lng: 345.345,
+        });
+      geocode.mockResolvedValue({ lat: 345.345, lng: 345.345 });
+      stayRepository.update.mockResolvedValue(1);
+
+      await updateStay(req, res);
+
+      expect(geocode).toHaveBeenCalledWith("Busan", stays[0].country);
+      expect(stayRepository.update).toHaveBeenCalledWith(
+        stays[0].id,
+        userId,
+        expect.objectContaining({
+          city: "Busan",
+          lat: 345.345,
+          lng: 345.345,
+        }),
+      );
       expect(res.status).toHaveBeenCalledWith(200);
       expect(res.json).toHaveBeenCalledWith({
-        id: 1,
-        city: "Seoul",
-        country: "South Korea",
-        start_at: "2026-02-27",
-        expected_end_at: "2026-03-02",
-        accommodation: "Seoul hostel",
+        ...stays[0],
+        ...{ city: "Busan", lat: 345.345, lng: 345.345 },
       });
     });
 
-    test("return 404 wien repository throws errors", async () => {
-      const body = {
-        expected_end_at: "2026-03-02",
+    test("When geocoding fail, update stay with null coords", async () => {
+      const req = {
+        userId,
+        params: { id: stays[0].id },
+        body: {
+          city: "mars",
+          country: "somewhere not earth",
+        },
       };
-      const req = { params: { id: 1 }, body };
+      const res = {
+        status: jest.fn().mockReturnThis(),
+        json: jest.fn(),
+      };
+
+      stayRepository.findOneByIdAndUserId
+        .mockResolvedValueOnce(stays[0])
+        .mockResolvedValueOnce({
+          ...stays[0],
+          city: "mars",
+          country: "somewhere not earth",
+          lat: null,
+          lng: null,
+        });
+      geocode.mockResolvedValue(null);
+      stayRepository.update.mockResolvedValue(1);
+
+      await updateStay(req, res);
+
+      expect(stayRepository.update).toHaveBeenCalledWith(
+        stays[0].id,
+        userId,
+        expect.objectContaining({ lat: null, lng: null }),
+      );
+      expect(res.status).toHaveBeenCalledWith(200);
+      expect(res.json).toHaveBeenCalledWith({
+        ...stays[0],
+        ...{
+          city: "mars",
+          country: "somewhere not earth",
+          lat: null,
+          lng: null,
+        },
+      });
+    });
+
+    test("return 400 when no updatable fields", async () => {
+      const req = { userId, params: { id: stays[0].id }, body: {} };
+      const res = {
+        status: jest.fn().mockReturnThis(),
+        json: jest.fn(),
+      };
+
+      await updateStay(req, res);
+
+      expect(stayRepository.update).not.toHaveBeenCalled();
+      expect(res.status).toHaveBeenCalledWith(400);
+      expect(res.json).toHaveBeenCalledWith({
+        message: "No updatable fields provided.",
+      });
+    });
+
+    test("return 404 when stay not found.", async () => {
+      const body = {
+        expectedEndAt: "2026-08-15",
+      };
+      const req = { userId, params: { id: "other" }, body };
       const res = {
         status: jest.fn().mockReturnThis(),
         json: jest.fn(),
@@ -250,10 +396,9 @@ describe("stay controller test", () => {
 
       await updateStay(req, res);
 
-      expect(stayRepository.update).toHaveBeenCalled();
       expect(res.status).toHaveBeenCalledWith(404);
       expect(res.json).toHaveBeenCalledWith({
-        message: "Something went wrong.",
+        message: "Stay not found.",
       });
     });
   });

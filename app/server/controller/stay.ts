@@ -135,7 +135,7 @@ export async function updateStay(
       return;
     }
     const city = params.city ?? prev.city;
-    const country = params.city ?? prev.city;
+    const country = params.country ?? prev.country;
     const coords = await geocode(city, country);
     params.lat = coords?.lat ?? null;
     params.lng = coords?.lng ?? null;
