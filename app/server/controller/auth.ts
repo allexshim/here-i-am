@@ -17,7 +17,7 @@ export async function signup(req: Request, res: Response): Promise<void> {
   if (typeof password !== "string" || password.length < 8) {
     res
       .status(400)
-      .json({ massage: "Password must be at least 8 characters." });
+      .json({ message: "Password must be at least 8 characters." });
     return;
   }
 
