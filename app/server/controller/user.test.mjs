@@ -46,22 +46,30 @@ const stays = [
   },
 ];
 
+function mockReq(overrides = {}) {
+  return { params: {}, body: {}, userId: user.id, ...overrides };
+}
+
+function mockRes() {
+  return {
+    status: jest.fn().mockReturnThis(),
+    json: jest.fn(),
+    sendStatus: jest.fn(),
+  };
+}
+
 describe("user controller test", () => {
   afterEach(() => {
     jest.clearAllMocks();
   });
 
   test("For a valid shareCode, return stay with 200 status", async () => {
-    const req = {
-      userId: user.id,
+    const req = mockReq({
       params: {
         shareCode: user.shareCode,
       },
-    };
-    const res = {
-      status: jest.fn().mockReturnThis(),
-      json: jest.fn(),
-    };
+    });
+    const res = mockRes();
 
     userRepository.findByShareCode.mockResolvedValue(user);
     stayRepository.findAllByUserId.mockResolvedValue(stays);
@@ -75,11 +83,8 @@ describe("user controller test", () => {
   });
 
   test("For a invalid sharedCode, return 404", async () => {
-    const req = { userId: user.id, params: { shareCode: user.shareCode } };
-    const res = {
-      status: jest.fn().mockReturnThis(),
-      json: jest.fn(),
-    };
+    const req = mockReq({ params: { shareCode: user.shareCode } });
+    const res = mockRes();
 
     userRepository.findByShareCode.mockResolvedValue(undefined);
 
@@ -91,11 +96,8 @@ describe("user controller test", () => {
   });
 
   test("When user has no stays, return 200 with empty array", async () => {
-    const req = { userId: user.id, params: { shareCode: user.shareCode } };
-    const res = {
-      status: jest.fn().mockReturnThis(),
-      json: jest.fn(),
-    };
+    const req = mockReq({ params: { shareCode: user.shareCode } });
+    const res = mockRes();
 
     userRepository.findByShareCode.mockResolvedValue(user);
     stayRepository.findAllByUserId.mockResolvedValue([]);

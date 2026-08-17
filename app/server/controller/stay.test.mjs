@@ -57,6 +57,18 @@ const stays = [
   },
 ];
 
+function mockReq(overrides = {}) {
+  return { params: {}, body: {}, userId, ...overrides };
+}
+
+function mockRes() {
+  return {
+    status: jest.fn().mockReturnThis(),
+    json: jest.fn(),
+    sendStatus: jest.fn(),
+  };
+}
+
 describe("stay controller test", () => {
   afterEach(() => {
     jest.clearAllMocks();
@@ -64,8 +76,7 @@ describe("stay controller test", () => {
 
   describe("createStay test", () => {
     test("get coords and create stay, returns new stay with status 201", async () => {
-      const req = {
-        userId,
+      const req = mockReq({
         body: {
           city: "Seoul",
           country: "South Korea",
@@ -73,11 +84,8 @@ describe("stay controller test", () => {
           expectedEndAt: "2026-08-10",
           accommodation: "Seoul Hostel",
         },
-      };
-      const res = {
-        status: jest.fn().mockReturnThis(),
-        json: jest.fn(),
-      };
+      });
+      const res = mockRes();
 
       geocode.mockResolvedValue({ lat: 123.123, lng: 123.123 });
       stayRepository.create.mockResolvedValue(stays[0]);
@@ -102,8 +110,7 @@ describe("stay controller test", () => {
     });
 
     test("When geocoding fail, create stay with null coords", async () => {
-      const req = {
-        userId,
+      const req = mockReq({
         body: {
           city: "mars",
           country: "somewhere not earth",
@@ -111,11 +118,8 @@ describe("stay controller test", () => {
           expectedEndAt: "2026-08-10",
           accommodation: "Seoul Hostel",
         },
-      };
-      const res = {
-        status: jest.fn().mockReturnThis(),
-        json: jest.fn(),
-      };
+      });
+      const res = mockRes();
 
       geocode.mockResolvedValue(null);
       stayRepository.create.mockResolvedValue({
@@ -134,21 +138,16 @@ describe("stay controller test", () => {
     });
 
     test("returns 500 with error message when repository throws error", async () => {
-      const body = {
-        city: "Seoul",
-        country: "South Korea",
-        startAt: "2026-03-02",
-        expectedEndAt: "2026-03-12",
-        accommodation: "Seoul Hostel",
-      };
-      const req = {
-        userId,
-        body,
-      };
-      const res = {
-        status: jest.fn().mockReturnThis(),
-        json: jest.fn(),
-      };
+      const req = mockReq({
+        body: {
+          city: "Seoul",
+          country: "South Korea",
+          startAt: "2026-03-02",
+          expectedEndAt: "2026-03-12",
+          accommodation: "Seoul Hostel",
+        },
+      });
+      const res = mockRes();
 
       stayRepository.create.mockRejectedValue(new Error("DB error"));
 
@@ -163,11 +162,8 @@ describe("stay controller test", () => {
 
   describe("getStays test", () => {
     test("return all stays owned by user with status 200", async () => {
-      const req = { userId };
-      const res = {
-        status: jest.fn().mockReturnThis(),
-        json: jest.fn(),
-      };
+      const req = mockReq();
+      const res = mockRes();
 
       stayRepository.findAllByUserId.mockResolvedValue(stays);
 
@@ -181,11 +177,8 @@ describe("stay controller test", () => {
 
   describe("getStayById test", () => {
     test("return stay with status 200", async () => {
-      const req = { userId, params: { id: stays[0].id } };
-      const res = {
-        status: jest.fn().mockReturnThis(),
-        json: jest.fn(),
-      };
+      const req = mockReq({ params: { id: stays[0].id } });
+      const res = mockRes();
 
       stayRepository.findOneByIdAndUserId.mockResolvedValue(stays[0]);
 
@@ -200,11 +193,8 @@ describe("stay controller test", () => {
     });
 
     test("return 404 when stay not found", async () => {
-      const req = { userId, params: { id: "other" } };
-      const res = {
-        status: jest.fn().mockReturnThis(),
-        json: jest.fn(),
-      };
+      const req = mockReq({ params: { id: "other" } });
+      const res = mockRes();
 
       stayRepository.findOneByIdAndUserId.mockResolvedValue(undefined);
 
@@ -217,10 +207,8 @@ describe("stay controller test", () => {
 
   describe("removeStay test", () => {
     test("returns 204 when stay is deleted", async () => {
-      const req = { userId, params: { id: stays[0].id } };
-      const res = {
-        sendStatus: jest.fn(),
-      };
+      const req = mockReq({ params: { id: stays[0].id } });
+      const res = mockRes();
 
       // mock affected row count
       stayRepository.remove.mockResolvedValue(1);
@@ -231,11 +219,8 @@ describe("stay controller test", () => {
     });
 
     test("return 404 when stay does not exist", async () => {
-      const req = { userId, params: { id: "other" } };
-      const res = {
-        status: jest.fn().mockReturnThis(),
-        json: jest.fn(),
-      };
+      const req = mockReq({ params: { id: "other" } });
+      const res = mockRes();
 
       // 0 rows affected
       stayRepository.remove.mockResolvedValue(0);
@@ -255,11 +240,8 @@ describe("stay controller test", () => {
         endAt: "2026-08-10",
         comment: "Left as plan",
       };
-      const req = { userId, params: { id: stays[0].id }, body };
-      const res = {
-        status: jest.fn().mockReturnThis(),
-        json: jest.fn(),
-      };
+      const req = mockReq({ params: { id: stays[0].id }, body });
+      const res = mockRes();
 
       stayRepository.update.mockResolvedValue(1);
       stayRepository.findOneByIdAndUserId.mockResolvedValue({
@@ -279,17 +261,13 @@ describe("stay controller test", () => {
     });
 
     test("coords changed: re-geocode when city, country changed", async () => {
-      const req = {
-        userId,
+      const req = mockReq({
         params: { id: stays[0].id },
         body: {
           city: "Busan",
         },
-      };
-      const res = {
-        status: jest.fn().mockReturnThis(),
-        json: jest.fn(),
-      };
+      });
+      const res = mockRes();
 
       stayRepository.findOneByIdAndUserId
         .mockResolvedValueOnce(stays[0])
@@ -322,18 +300,14 @@ describe("stay controller test", () => {
     });
 
     test("When geocoding fail, update stay with null coords", async () => {
-      const req = {
-        userId,
+      const req = mockReq({
         params: { id: stays[0].id },
         body: {
           city: "mars",
           country: "somewhere not earth",
         },
-      };
-      const res = {
-        status: jest.fn().mockReturnThis(),
-        json: jest.fn(),
-      };
+      });
+      const res = mockRes();
 
       stayRepository.findOneByIdAndUserId
         .mockResolvedValueOnce(stays[0])
@@ -367,11 +341,8 @@ describe("stay controller test", () => {
     });
 
     test("return 400 when no updatable fields", async () => {
-      const req = { userId, params: { id: stays[0].id }, body: {} };
-      const res = {
-        status: jest.fn().mockReturnThis(),
-        json: jest.fn(),
-      };
+      const req = mockReq({ params: { id: stays[0].id }, body: {} });
+      const res = mockRes();
 
       await updateStay(req, res);
 
@@ -383,14 +354,11 @@ describe("stay controller test", () => {
     });
 
     test("return 404 when stay not found.", async () => {
-      const body = {
-        expectedEndAt: "2026-08-15",
-      };
-      const req = { userId, params: { id: "other" }, body };
-      const res = {
-        status: jest.fn().mockReturnThis(),
-        json: jest.fn(),
-      };
+      const req = mockReq({
+        params: { id: "other" },
+        body: { expectedEndAt: "2026-08-15" },
+      });
+      const res = mockRes();
 
       stayRepository.update.mockResolvedValue(0);
 
